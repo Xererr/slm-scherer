@@ -12,7 +12,8 @@ Dados e checkpoints **nunca vão para o Git**. Ficam no `/scratch` do cluster CD
 │   ├── mid_c/{train,val}/        # mid-training C (controle): só chat (~300M tokens)
 │   └── sft/{train,val}/          # SFT: chat + matemática (~100M tokens)
 ├── checkpoints/                  # pesos e estado do otimizador de cada etapa
-│   └── pretrain/                 # pré-treino final: ckpt_*.pt, final.pt, metrics.jsonl, .lock
+│   ├── pretrain/                 # pré-treino final: ckpt_*.pt, final.pt, metrics.jsonl, .lock
+│   └── pretrain_marcos/          # cópias permanentes: final.pt e ckpt_000045000.pt
 └── runs/                         # logs de treino e amostras de geração
 ```
 
@@ -33,14 +34,18 @@ Gerados por `sbatch slurm/pretrain.sbatch` (config `configs/final/pretrain.yaml`
 
 | Arquivo | Conteúdo |
 |---|---|
-| `ckpt_<step>.pt` | Pesos, estado do AdamW e posição nos dados. A cada 5.000 steps (~30 min); ficam só os 2 últimos. *Estimativa:* ~1,4 GB cada (fp32) |
+| `ckpt_<step>.pt` | Pesos, estado do AdamW e posição nos dados. A cada 5.000 steps (~30 min); ficam só os 3 últimos. *Estimativa:* ~1,4 GB cada (fp32) |
 | `final.pt` | Só os pesos, no fim do treino (~0,5 GB, *estimativa*). Se ele existe, o job não faz nada |
 | `metrics.jsonl` | Uma linha por log ou avaliação: loss, LR, norma do gradiente, tokens/s, `val_loss` e `val_ppl` |
-| `.lock` | Trava (`flock`): impede dois jobs gravando no mesmo diretório |
+| `.lock` | Trava (`flock`): impede dois jobs gravando no mesmo diretório. Testada no `/scratch` do CDIA em 11/11 |
 
 - **Retomada:** qualquer membro do grupo retoma do último `ckpt_*.pt` submetendo `sbatch slurm/pretrain.sbatch` do próprio clone. A posição nos dados está no checkpoint, então nenhum registro é repetido ou pulado.
 - **Permissões:** o job usa `umask 002`, para os outros membros conseguirem continuar o treino e apagar checkpoints antigos.
-- **Não apague nada aqui durante o treino.** Marcos que precisem ser guardados: copiar para `/home` (cota de 10 GB) ou publicar no HF, já que o `/scratch` não tem backup.
+- **Não apague nada aqui durante o treino.**
+- **Marcos (`checkpoints/pretrain_marcos/`):** no fim do treino, o `slurm/pretrain.sbatch` copia para cá o `final.pt` (~0,5 GB) e o `ckpt_000045000.pt` (~1,4 GB). O `keep_last` não alcança esta pasta. O ckpt 45.000 é o último da fase estável: o decaimento do WSD começa no passo 45.733.
+- **Refazer o decaimento** (se o fim do treino der errado): copiar `pretrain_marcos/ckpt_000045000.pt` para uma pasta nova, apontar o `run_dir` de uma cópia da config para ela e submeter. O treino retoma do passo 45.000 com os mesmos dados e a mesma LR, já que os dois dependem só da posição global.
+- **Os marcos não protegem de falha do disco:** o `/scratch` não tem backup. Publicar o `final.pt` no HF logo depois do treino.
+- **Regra do grupo:** o pré-treino só roda por `sbatch slurm/pretrain.sbatch`. Rodar `scripts/pretrain.py` direto ignora a trava.
 - O log do Slurm fica em `logs/` do clone de quem submeteu; o cache do Triton, em `/scratch/$USER/slm/triton-cache`.
 
 ## Fora do diretório compartilhado

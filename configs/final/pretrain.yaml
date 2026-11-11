@@ -13,7 +13,8 @@ log_every: 100
 eval_every: 2500          # ~15 min; perplexidade de validacao ao longo do treino (exigencia do enunciado)
 eval_batches: 100
 ckpt_every: 5000          # ~30 min (PLANO, Fase 4)
-keep_last: 2
+keep_last: 3              # 3, nao 2: o ckpt do passo 45.000 (fim da fase estavel) sobrevive
+                          # mesmo se o job for interrompido entre 45.000 e 50.000
 model:
   d_model: 768
   n_layer: 12

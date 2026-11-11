@@ -41,3 +41,23 @@ echo "=== pre-treino final em 2 GPUs"
 # Corte por tempo meia hora antes do limite do Slurm (36h): salva checkpoint e sai; resubmeter retoma.
 torchrun --standalone --nproc_per_node=2 scripts/pretrain.py \
     --config configs/final/pretrain.yaml --max-hours 35.5
+
+# Marcos, fora do alcance do keep_last (que apaga os checkpoints antigos):
+# - final.pt: pesos do fim do treino.
+# - ckpt_000045000.pt: ultimo checkpoint periodico da fase estavel (o decaimento do WSD comeca no
+#   passo 45.733). Tem o estado do AdamW e a posicao nos dados: permite refazer o decaimento.
+marcos="$SLM_SHARED/checkpoints/pretrain_marcos"
+if [ -f "$run_dir/final.pt" ]; then
+    mkdir -p "$marcos"
+    for f in final.pt ckpt_000045000.pt; do
+        if [ -f "$marcos/$f" ]; then
+            echo "=== marco $f ja guardado"
+        elif [ -f "$run_dir/$f" ]; then
+            cp "$run_dir/$f" "$marcos/$f.tmp" && mv "$marcos/$f.tmp" "$marcos/$f"
+            echo "=== marco guardado: $marcos/$f"
+        else
+            echo "AVISO: $run_dir/$f nao existe; marco nao guardado"
+        fi
+    done
+    ls -la "$marcos"
+fi

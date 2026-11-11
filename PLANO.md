@@ -272,9 +272,13 @@ Modelo de ~32M (d=384, L=8) em 500M tokens: ~1h por run em 1 GPU (medido: 184 mi
 ### Fase 4: Pré-treino final (~5–6h em 2 GPUs obrigatórias, batch de 24 por GPU)
 - [x] Config e job: `configs/final/pretrain.yaml` e `slurm/pretrain.sbatch`. 1 época (2.497.560.576 tokens), LR 3e-4, warmup de 100M tokens, avaliação a cada 2.500 steps (~15 min), checkpoint a cada 5.000 steps (~30 min). Reserva de 36h
 - [ ] Submeter: conta e momento a definir pelo grupo. O piloto terminou em 11/11 e liberou a vaga do `ap205`. Fila em 11/11 ~16h: as 2 GPUs ocupadas (1137 até no máximo Qui 12 ~22h; 1146 até no máximo Qui 12 ~15h30) e o 1148 (1 GPU, limite de 2 dias) na frente de qualquer submissão nova. Pior caso de início com 2 GPUs: Sáb 14 ~15h30, o que empurraria as Fases 5 a 8 para o fim de semana
-- [ ] Checkpoint a cada ~30 min, mantendo os 2 últimos. Marcos: copiar à mão para `/home` ou HF (o trainer não guarda marcos)
+- [x] Marcos: `keep_last: 3`, e no fim do job o `slurm/pretrain.sbatch` copia o `final.pt` e o `ckpt_000045000.pt` para `checkpoints/pretrain_marcos/`. O decaimento do WSD começa no passo 45.733; o ckpt 45.000 é o último da fase estável e permite refazer o decaimento
+- [ ] Checkpoint a cada ~30 min, mantendo os 3 últimos
 - [ ] Logar loss e perplexidade de validação (`metrics.jsonl`, junto dos checkpoints); guardar amostras de geração
 - [ ] Na primeira hora: conferir a velocidade em 2 GPUs (nunca medida) e a curva de loss com LR 3e-4
+- [x] Trava (`flock`) testada no `/scratch` do CDIA em 11/11: um segundo processo é barrado e a trava se solta quando o primeiro termina
+- [ ] Regra do grupo: o pré-treino só roda por `sbatch slurm/pretrain.sbatch`. Rodar `scripts/pretrain.py` direto ignora a trava e pode corromper os checkpoints compartilhados
+- [ ] Amostras de geração, HellaSwag e ARC do checkpoint final: *proposta* de rodar o `evaluate.py` no início do job da Fase 5, sem gastar uma entrada a mais na fila
 
 **Saída:** curvas sem anomalias; texto coerente; HellaSwag acima do acaso. **Publicar o checkpoint** no HF.
 
@@ -343,7 +347,7 @@ Dados e checkpoints ficam em `/scratch/ap211/slm-shared/`, nunca no Git. Estrutu
 | Falta de memória na GPU durante o treino | Batch de 24 (~7 GB de folga); avaliação sem gradiente e com batch menor |
 | Run interrompido | Checkpoints frequentes e retomada testada na Fase 1 |
 | LR alta para o nosso batch (pré-treino instável) | 3e-4 é metade do valor do GPT-3 Small; curva de loss conferida na primeira hora; o trainer aborta em loss não finita. Se divergir: reduzir a LR e recomeçar |
-| `/scratch` sem backup | Copiar os marcos para `/home` e publicar no HF |
+| `/scratch` sem backup | Marcos copiados para `checkpoints/pretrain_marcos/` no fim do job (protege do `keep_last`, não de falha do disco). Publicar o `final.pt` no HF logo depois do treino |
 | Matemática sem efeito | Piloto (11/11): efeito significativo na aritmética (M × pré p = 0,0003; M × C p = 0,006), concentrado em 1 dígito. Tarefa reserva mantida; resultado negativo reportado com IC |
 | Mid-training piora o conhecimento geral | No piloto, o ARC-Easy caiu ~9 pp e a perplexidade no FineWeb quase dobrou após o mid (M e C). Medir no modelo final e discutir nos slides |
 | Geração em CPU lenta na demo | Medir com antecedência; vídeo de reserva |
