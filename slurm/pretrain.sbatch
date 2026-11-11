@@ -1,9 +1,8 @@
 #!/bin/bash
 # Fase 4: pre-treino final (~114M params, 1 epoca do FineWeb-Edu = ~2,5B tokens).
-# Padrao: 2 GPUs (DDP, exigencia do enunciado). Plano B em 1 GPU:
-#   sbatch --gres=gpu:1 -c 16 --mem=48G slurm/pretrain.sbatch
-# Le e grava em $SLM_SHARED: qualquer membro do grupo retoma do ultimo checkpoint ao resubmeter,
-# inclusive com outro numero de GPUs.
+# 2 GPUs obrigatorias (DDP, exigencia do enunciado): o job aborta se nao tiver as duas.
+# Limite de 36h para ~5-6h estimadas: reserva folgada, decidida pelo grupo em 11/11.
+# Le e grava em $SLM_SHARED: qualquer membro do grupo retoma do ultimo checkpoint ao resubmeter.
 #SBATCH -J slm-pretrain
 #SBATCH --gres=gpu:2
 #SBATCH -c 32
@@ -32,13 +31,13 @@ if ! flock -n 9; then
 fi
 
 ngpu=$(python -c "import torch; print(torch.cuda.device_count())")
-if [ "$ngpu" -lt 1 ]; then
-    echo "nenhuma GPU visivel: abortando"
+if [ "$ngpu" -ne 2 ]; then
+    echo "o pre-treino final exige 2 GPUs (visiveis: $ngpu): abortando"
     exit 1
 fi
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv || true
-echo "=== pre-treino final em $ngpu GPU(s)"
+echo "=== pre-treino final em 2 GPUs"
 
 # Corte por tempo meia hora antes do limite do Slurm (36h): salva checkpoint e sai; resubmeter retoma.
-torchrun --standalone --nproc_per_node="$ngpu" scripts/pretrain.py \
+torchrun --standalone --nproc_per_node=2 scripts/pretrain.py \
     --config configs/final/pretrain.yaml --max-hours 35.5

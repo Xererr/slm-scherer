@@ -5,8 +5,9 @@ data_dir: ${SLM_SHARED}/data/pretrain/train
 val_dir: ${SLM_SHARED}/data/pretrain/val
 epochs: 1.0               # 2.439.024 registros x 1.024 = 2.497.560.576 tokens (~22 x N), sem repetir dados
 batch_size: 24            # por GPU; 17,4 GB no benchmark, ~7 GB de folga
-peak_lr: 6.0e-4           # GPT-3 Small (125M), Brown et al. 2020, Tabela 2.1 (la com batch de 0,5M tokens)
-warmup_tokens: 100000000  # ~2.000 steps em 2 GPUs (PLANO, Secao 4); ~4.000 em 1 GPU
+peak_lr: 3.0e-4           # meio-termo: GPT-3 Small usou 6e-4 com batch de ~0,5M tokens (Brown et al. 2020);
+                          # ajustado pela raiz do nosso batch (~49k tokens) daria ~1,8e-4. Ver PLANO, Secao 4
+warmup_tokens: 100000000  # ~2.000 steps em 2 GPUs (PLANO, Secao 4)
 decay_frac: 0.1           # WSD: decaimento linear nos 10% finais
 log_every: 100
 eval_every: 2500          # ~15 min; perplexidade de validacao ao longo do treino (exigencia do enunciado)

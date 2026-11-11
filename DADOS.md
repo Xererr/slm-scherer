@@ -12,6 +12,7 @@ Dados e checkpoints **nunca vão para o Git**. Ficam no `/scratch` do cluster CD
 │   ├── mid_c/{train,val}/        # mid-training C (controle): só chat (~300M tokens)
 │   └── sft/{train,val}/          # SFT: chat + matemática (~100M tokens)
 ├── checkpoints/                  # pesos e estado do otimizador de cada etapa
+│   └── pretrain/                 # pré-treino final: ckpt_*.pt, final.pt, metrics.jsonl, .lock
 └── runs/                         # logs de treino e amostras de geração
 ```
 
@@ -25,6 +26,22 @@ Quem tem acesso: `ap211`, `ap212`, `ap205` e `ap206`, como membros do grupo `AP2
 Para consertar: `chmod -R g+rwX /scratch/ap211/slm-shared`. O `slurm/data.sbatch` já define o `umask`.
 
 O diretório fica dentro de `/scratch/ap211/` de propósito: a raiz `/scratch` tem permissão 777 sem sticky bit, e qualquer usuário poderia renomear ou apagar uma pasta criada nela.
+
+## Checkpoints do pré-treino final
+
+Gerados por `sbatch slurm/pretrain.sbatch` (config `configs/final/pretrain.yaml`) em `checkpoints/pretrain/`:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `ckpt_<step>.pt` | Pesos, estado do AdamW e posição nos dados. A cada 5.000 steps (~30 min); ficam só os 2 últimos. *Estimativa:* ~1,4 GB cada (fp32) |
+| `final.pt` | Só os pesos, no fim do treino (~0,5 GB, *estimativa*). Se ele existe, o job não faz nada |
+| `metrics.jsonl` | Uma linha por log ou avaliação: loss, LR, norma do gradiente, tokens/s, `val_loss` e `val_ppl` |
+| `.lock` | Trava (`flock`): impede dois jobs gravando no mesmo diretório |
+
+- **Retomada:** qualquer membro do grupo retoma do último `ckpt_*.pt` submetendo `sbatch slurm/pretrain.sbatch` do próprio clone. A posição nos dados está no checkpoint, então nenhum registro é repetido ou pulado.
+- **Permissões:** o job usa `umask 002`, para os outros membros conseguirem continuar o treino e apagar checkpoints antigos.
+- **Não apague nada aqui durante o treino.** Marcos que precisem ser guardados: copiar para `/home` (cota de 10 GB) ou publicar no HF, já que o `/scratch` não tem backup.
+- O log do Slurm fica em `logs/` do clone de quem submeteu; o cache do Triton, em `/scratch/$USER/slm/triton-cache`.
 
 ## Fora do diretório compartilhado
 
