@@ -21,8 +21,7 @@ Revisado em 10/11 e 11/11: a Fase 3 começou com ~2 dias de atraso em relação 
 | Qui 05 – Seg 09 | Fases 0, 1 e 2: ambiente, núcleo de treino, smoke tests, dados | ✅ Concluídas (dados prontos em 09/11) |
 | Ter 10 – Qua 11 | Fase 3: piloto ✅ (job 1140, Qua 11, 13h54–15h24) | **Decisão (pendente do grupo): manter a matemática; tokenizer GPT-2** |
 | Qua 11 – Sáb 14 | Fase 4: pré-treino final, **2 GPUs obrigatórias** (~5–6h; job com reserva de 36h). Job 1152 na fila desde Qua 11; pior caso de início Sex 13 ~23h15 | Checkpoint publicado |
-| Sex 13 – Sáb 14 | Fase 5: mid-training M e C | Veredito da matemática |
-| Sáb 14 | Fase 6: SFT | Checkpoint final |
+| Sáb 14 | Fases 5 e 6 num job só: avaliação do pré-treino, mid-training M e C, SFT e avaliações (`slurm/mid_sft.sbatch`, 1 GPU, ~5–7h *estimativa*) + fila | Veredito da matemática e checkpoint final |
 | Dom 15 – Seg 16 | Fases 7 e 8: avaliação final e demo | Tabelas e demo funcionando |
 | Ter 17 – Qua 18 | Fase 8: README, checkpoints no HF, slides, ensaio | Entrega pronta |
 | Qui 19 | Entrega | |
@@ -82,6 +81,8 @@ Revisado em 10/11 e 11/11: a Fase 3 começou com ~2 dias de atraso em relação 
 ```bash
 sbatch slurm/pretrain.sbatch   # da raiz do clone; qualquer membro do grupo
 ```
+
+**Job das Fases 5 e 6:** `slurm/mid_sft.sbatch` (1 GPU, 8 CPUs, 48 GB, limite de 24h). Só roda depois do pré-treino: aborta se faltar o `pretrain/final.pt`.
 
 - **Corte por tempo:** o rank 0 decide, com `--max-hours` (35,5h no pré-treino final), salvar e sair antes do limite. É mais simples que sinais, porque o `torchrun` não repassa `SIGUSR1`.
 - **Retomada automática:** repetir o mesmo comando continua do último checkpoint, mesmo com outro número de GPUs.
@@ -279,26 +280,28 @@ Modelo de ~32M (d=384, L=8) em 500M tokens: ~1h por run em 1 GPU (medido: 184 mi
 - [ ] Na primeira hora: conferir a velocidade em 2 GPUs (nunca medida) e a curva de loss com LR 3e-4
 - [x] Trava (`flock`) testada no `/scratch` do CDIA em 11/11: um segundo processo é barrado e a trava se solta quando o primeiro termina
 - [ ] Regra do grupo: o pré-treino só roda por `sbatch slurm/pretrain.sbatch`. Rodar `scripts/pretrain.py` direto ignora a trava e pode corromper os checkpoints compartilhados
-- [ ] Amostras de geração, HellaSwag e ARC do checkpoint final: *proposta* de rodar o `evaluate.py` no início do job da Fase 5, sem gastar uma entrada a mais na fila
+- [x] Avaliação do checkpoint final (perplexidade, HellaSwag, ARC-Easy, aritmética e GSM8K, com 5 amostras de geração): automatizada no início do `slurm/mid_sft.sbatch`, sem gastar outra entrada na fila
 
 **Saída:** curvas sem anomalias; texto coerente; HellaSwag acima do acaso. **Publicar o checkpoint** no HF.
 
 ### Fase 5: Mid-training
-- [ ] Pesos do pré-treino, otimizador zerado, LR 1e-4 a 3e-4, warmup curto, 300M tokens
-- [ ] Rodar M e C em sequência, no mesmo job (limite de 1 job por usuário)
+- [x] Configs `configs/final/mid_m.yaml` e `mid_c.yaml`: pesos do pré-treino final, otimizador zerado, LR 3e-4 (topo da faixa do enunciado, igual ao piloto), warmup de 10M tokens (~400 steps), 1 época de cada conjunto (M: 15.225 steps, ~294M tokens úteis; C: 14.669 steps, ~292M). Aritmética medida a cada 1.500 steps
+- [x] Job `slurm/mid_sft.sbatch`: M, C e SFT em sequência, em 1 GPU (limite de 1 job por usuário). Checkpoints em `slm-shared/checkpoints/{mid_m,mid_c,sft}`, trava própria (`.lock_mid_sft`). Cada etapa pula se já terminou
+- [ ] Submeter depois do pré-treino. *Opção a testar:* outro membro submete antes com `--dependency=afterok:1152`, para garantir a posição na fila (não verificado se o cluster aceita dependência de job de outro usuário)
 - [ ] Rodar os testes e aplicar o critério da Seção 6
 - [ ] Acompanhar a perplexidade no FineWeb: na miniatura, ela piorou após o mid (de ~154 para ~242); no piloto, de 32,4 para 61,4 (M) e 56,4 (C)
 
 **Saída:** veredito e checkpoint publicado.
 
 ### Fase 6: SFT
-- [ ] A partir de M. Máscara `-100` em tudo que não for resposta do assistente (incluir `<|end|>`, para o modelo aprender a parar)
-- [ ] LR 1e-5 a 3e-5, 1–2 épocas, subset curado; monitorar validação para detectar overfitting
+- [x] A partir de M. Máscara `-100` em tudo que não for resposta do assistente, incluindo o `<|end|>` (implementada e testada na Fase 1)
+- [x] Config `configs/final/sft.yaml`: LR 2e-5 (meio da faixa do enunciado), 1 época (5.070 steps, ~98M tokens úteis), warmup de 3M tokens. Roda no mesmo job do mid
+- [ ] Conferir a curva de validação (avaliada a cada 500 steps) para detectar overfitting, e a parada correta em `<|end|>`
 
 **Saída:** para as mesmas perguntas, respostas melhores que no mid, com parada correta.
 
 ### Fase 7: Avaliação final
-- [ ] Em pré, C, M e SFT: perplexidade, HellaSwag, ARC-Easy (múltiplos benchmarks são diferencial), aritmética e GSM8K
+- [ ] Em pré, C, M e SFT: perplexidade, HellaSwag, ARC-Easy (múltiplos benchmarks são diferencial), aritmética e GSM8K. Automatizado no `slurm/mid_sft.sbatch` (`results/final/*.json`), com McNemar M × pré, M × C e SFT × M
 - [ ] Comparar antes e depois do SFT nas mesmas perguntas
 - [ ] Gerar tabelas e gráficos a partir de `results/*.json`
 
@@ -351,6 +354,7 @@ Dados e checkpoints ficam em `/scratch/ap211/slm-shared/`, nunca no Git. Estrutu
 | `/scratch` sem backup | Marcos copiados para `checkpoints/pretrain_marcos/` no fim do job (protege do `keep_last`, não de falha do disco). Publicar o `final.pt` no HF logo depois do treino |
 | Matemática sem efeito | Piloto (11/11): efeito significativo na aritmética (M × pré p = 0,0003; M × C p = 0,006), concentrado em 1 dígito. Tarefa reserva mantida; resultado negativo reportado com IC |
 | Mid-training piora o conhecimento geral | No piloto, o ARC-Easy caiu ~9 pp e a perplexidade no FineWeb quase dobrou após o mid (M e C). Medir no modelo final e discutir nos slides |
+| Job das Fases 5 e 6 longo (a avaliação do modelo de 114M não foi medida) | Reserva de 24h; cada etapa pula se já terminou, então resubmeter retoma do ponto em que parou |
 | Geração em CPU lenta na demo | Medir com antecedência; vídeo de reserva |
 
 ---

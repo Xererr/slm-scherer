@@ -1,0 +1,13 @@
+# Fase 5: mid-training M (75% chat + 25% matematica). Parte do pre-treino final, com o otimizador zerado.
+run_dir: ${SLM_SHARED}/checkpoints/mid_m
+data_dir: ${SLM_SHARED}/data/mid_m/train
+val_dir: ${SLM_SHARED}/data/mid_m/val
+init_from: ${SLM_SHARED}/checkpoints/pretrain/final.pt
+epochs: 1.0               # 365.386 registros = 15.225 steps; cada conversa uma vez (~294M tokens uteis)
+batch_size: 24            # mesmo do pre-treino (17,4 GB no benchmark)
+peak_lr: 3.0e-4           # topo da faixa do enunciado (1e-4 a 3e-4); mesmo valor do piloto
+warmup_tokens: 10000000   # ~400 steps
+log_every: 100
+eval_every: 1500          # ~10 avaliacoes; cada uma mede tambem a aritmetica (curva do mid)
+eval_batches: 50
+ckpt_every: 2500          # ~15 min

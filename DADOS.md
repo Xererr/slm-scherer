@@ -13,7 +13,9 @@ Dados e checkpoints **nunca vão para o Git**. Ficam no `/scratch` do cluster CD
 │   └── sft/{train,val}/          # SFT: chat + matemática (~100M tokens)
 ├── checkpoints/                  # pesos e estado do otimizador de cada etapa
 │   ├── pretrain/                 # pré-treino final: ckpt_*.pt, final.pt, metrics.jsonl, .lock
-│   └── pretrain_marcos/          # cópias permanentes: final.pt e ckpt_000045000.pt
+│   ├── pretrain_marcos/          # cópias permanentes: final.pt e ckpt_000045000.pt
+│   ├── mid_m/, mid_c/, sft/      # Fases 5 e 6: ckpt_*.pt, final.pt, metrics.jsonl
+│   └── .lock_mid_sft             # trava do job das Fases 5 e 6
 └── runs/                         # logs de treino e amostras de geração
 ```
 
@@ -47,6 +49,22 @@ Gerados por `sbatch slurm/pretrain.sbatch` (config `configs/final/pretrain.yaml`
 - **Os marcos não protegem de falha do disco:** o `/scratch` não tem backup. Publicar o `final.pt` no HF logo depois do treino.
 - **Regra do grupo:** o pré-treino só roda por `sbatch slurm/pretrain.sbatch`. Rodar `scripts/pretrain.py` direto ignora a trava.
 - O log do Slurm fica em `logs/` do clone de quem submeteu; o cache do Triton, em `/scratch/$USER/slm/triton-cache`.
+
+## Checkpoints do mid-training e do SFT
+
+Gerados por `sbatch slurm/mid_sft.sbatch` (configs `configs/final/{mid_m,mid_c,sft}.yaml`), em 1 GPU:
+
+| Pasta | Parte de | Dados | Steps |
+|---|---|---|---|
+| `mid_m/` | `pretrain/final.pt` | `data/mid_m`, 1 época | 15.225 |
+| `mid_c/` | `pretrain/final.pt` | `data/mid_c`, 1 época | 14.669 |
+| `sft/` | `mid_m/final.pt` | `data/sft`, 1 época, loss só nas respostas | 5.070 |
+
+- Mesmos tipos de arquivo do pré-treino (`ckpt_*.pt`, `final.pt`, `metrics.jsonl`), mantendo os 2 últimos checkpoints periódicos. *Estimativa:* ~1,4 GB por checkpoint periódico.
+- O `metrics.jsonl` do mid tem também a aritmética de cada avaliação (`arith_acc` e uma coluna por célula): é a curva do mid-training.
+- **1 época:** o último lote completa o batch com registros da época seguinte (14 em M, 21 em C e 17 no SFT; menos de 0,02%).
+- **Retomada:** qualquer membro resubmete o mesmo `sbatch`. Cada treino pula se já tem `final.pt`, e a trava `.lock_mid_sft` impede dois jobs ao mesmo tempo.
+- **Resultados:** `results/final/{pretrain,mid_m,mid_c,sft}.json` ficam no clone de quem submeteu. Quem retomar de outro clone refaz as avaliações que não estiverem no seu. Versionar os JSONs no Git depois.
 
 ## Fora do diretório compartilhado
 

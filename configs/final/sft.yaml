@@ -1,0 +1,14 @@
+# Fase 6: SFT a partir de M. Loss so nas respostas do assistente (mascara -100 no resto).
+run_dir: ${SLM_SHARED}/checkpoints/sft
+data_dir: ${SLM_SHARED}/data/sft/train
+val_dir: ${SLM_SHARED}/data/sft/val
+init_from: ${SLM_SHARED}/checkpoints/mid_m/final.pt
+use_loss_mask: true
+epochs: 1.0               # 121.663 registros = 5.070 steps (~98M tokens uteis)
+batch_size: 24
+peak_lr: 2.0e-5           # meio da faixa do enunciado (1e-5 a 3e-5)
+warmup_tokens: 3000000    # ~120 steps
+log_every: 50
+eval_every: 500           # ~10 avaliacoes da loss de validacao: deteccao de overfitting
+eval_batches: 50
+ckpt_every: 1000          # ~6 min
