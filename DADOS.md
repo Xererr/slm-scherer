@@ -36,7 +36,7 @@ Gerados por `sbatch slurm/pretrain.sbatch` (config `configs/final/pretrain.yaml`
 
 | Arquivo | Conteúdo |
 |---|---|
-| `ckpt_<step>.pt` | Pesos, estado do AdamW e posição nos dados. A cada 5.000 steps (~30 min); ficam só os 3 últimos. *Estimativa:* ~1,4 GB cada (fp32) |
+| `ckpt_<step>.pt` | Pesos, estado do AdamW e posição nos dados. A cada 5.000 steps (~30 min); ficam só os 3 últimos. 1.369.545.217 bytes cada (~1,37 GB, medido em 15/11) |
 | `final.pt` | Só os pesos, no fim do treino (~0,5 GB, *estimativa*). Se ele existe, o job não faz nada |
 | `metrics.jsonl` | Uma linha por log ou avaliação: loss, LR, norma do gradiente, tokens/s, `val_loss` e `val_ppl` |
 | `.lock` | Trava (`flock`): impede dois jobs gravando no mesmo diretório. Testada no `/scratch` do CDIA em 11/11 |
@@ -60,7 +60,7 @@ Gerados por `sbatch slurm/mid_sft.sbatch` (configs `configs/final/{mid_m,mid_c,s
 | `mid_c/` | `pretrain/final.pt` | `data/mid_c`, 1 época | 14.669 |
 | `sft/` | `mid_m/final.pt` | `data/sft`, 1 época, loss só nas respostas | 5.070 |
 
-- Mesmos tipos de arquivo do pré-treino (`ckpt_*.pt`, `final.pt`, `metrics.jsonl`), mantendo os 2 últimos checkpoints periódicos. *Estimativa:* ~1,4 GB por checkpoint periódico.
+- Mesmos tipos de arquivo do pré-treino (`ckpt_*.pt`, `final.pt`, `metrics.jsonl`), mantendo os 2 últimos checkpoints periódicos. ~1,37 GB por checkpoint periódico (mesmo tamanho dos do pré-treino, medido em 15/11).
 - O `metrics.jsonl` do mid tem também a aritmética de cada avaliação (`arith_acc` e uma coluna por célula): é a curva do mid-training.
 - **1 época:** o último lote completa o batch com registros da época seguinte (14 em M, 21 em C e 17 no SFT; menos de 0,02%).
 - **Retomada:** qualquer membro resubmete o mesmo `sbatch`. Cada treino pula se já tem `final.pt`, e a trava `.lock_mid_sft` impede dois jobs ao mesmo tempo.
