@@ -2,7 +2,7 @@
 
 Pipeline: **Pré-treino (FineWeb-Edu) → Mid-training (chat + matemática, com benchmark antes e depois) → SFT → Avaliação & Demo**
 
-Atualizado em 16/11/2026. **Prazo: 19/11/2026** (3 dias). Os itens marcados como *estimativa* são validados na Fase 0 ou na Fase 3.
+Atualizado em 18/11/2026. **Prazo: 19/11/2026** (1 dia). Os itens marcados como *estimativa* são validados na Fase 0 ou na Fase 3.
 
 **Decisões fechadas**
 - Modelo de ~114M parâmetros, com 2,5B tokens no pré-treino.
@@ -14,10 +14,10 @@ Atualizado em 16/11/2026. **Prazo: 19/11/2026** (3 dias). Os itens marcados como
 - **(15/11) Acúmulo de gradiente no M local:** micro-lotes somados até 24 registros por passo, com a loss ponderada pelos tokens válidos do passo inteiro (não pela média de cada micro-lote, que distorce com padding e máscara). Assim o M local tem o mesmo batch efetivo, LR, schedule e ordem de dados do C no servidor. Só entra depois dos testes de equivalência em CPU (Fase 5).
 - **(15/11) Avaliação dos 4 modelos (pré, M, C e SFT) numa única máquina**, no fim, para a comparação (McNemar) não misturar GPUs.
 - **(15/11) Branches:** `midtraining-c` sai da `pre-treino` (um PR só para pré-treino e C); `midtraining-m` sai da `midtraining-c`. A `mid-sft` fica parada, para ser reaproveitada no SFT.
-- **(16/11) PRs:** #1 (`main` do fork: piloto e pré-treino) aceito em 15/11; #2 (`midtraining-c`) aceito em 16/11. PR final da `midtraining-m`: a abrir em https://github.com/FHaggs/slm/compare/main...Xererr:slm-scherer:midtraining-m. A `mid-sft` não vai para PR (anterior ao #2).
+- **(18/11) PRs:** #1 (piloto e pré-treino) aceito em 15/11; #2 (`midtraining-c`) em 16/11; #3 (`main` do fork: Fases 5–7, `ENTREGA.md` e página do modelo) em 18/11. As mudanças de 18/11 (README da raiz, `ENTREGA.md` e `hf/README.md` atualizados) estão na `main` do fork e vão no PR #4. A `mid-sft` não vai para PR
 - **(15/11) GPUs alternativas avaliadas e descartadas:** RX 7800 XT de 16 GB (ROCm só tem suporte no Linux; no Windows, a AMD declara que não há suporte a treino), RTX 3050 e RTX 2060 Super (8 GB ou menos; a 2060 Super não tem bf16).
 - **(16/11) M e SFT também no servidor:** com o C pronto e uma GPU aparentemente livre, foi submetido o `slurm/mid_sft.sbatch` (branch `mid-sft`, job 1175): avaliação do pré-treino → M → C (pulado, já existe) → SFT → avaliações de M, C e SFT → McNemar, tudo em 1 GPU, lote 24 sem acúmulo. O M local (RTX 4060, com acúmulo) continua como reserva e como teste do acúmulo de gradiente. *Proposta (a decidir):* o M e o SFT do servidor como oficiais, por terem a mesma GPU, o mesmo lote e o mesmo ambiente do C.
-- *(16/11, noite) A decidir:* M, SFT e as avaliações locais terminaram às 11h18 de Seg 16. Proposta do Orange: usar o M e o SFT **locais** como oficiais, avaliar o C na mesma máquina local e cancelar o job 1175 (que só começaria Qua 18, 11h58), liberando a GPU para as outras turmas.
+- **(18/11) Entrega com o que está no Hugging Face:** M e SFT locais (RTX 4060) são os oficiais. O C (treinado no servidor em 16/11) entra em **seção separada**, como último item pendente: curva do treino e evidência do piloto, sem a avaliação final na mesma máquina. Se a avaliação rodar antes da apresentação, os números entram na tabela. Job 1175 (cópia de M e SFT no servidor): situação não verificada em 18/11; se rodou, os checkpoints dele não são os oficiais
 
 ---
 
@@ -392,17 +392,18 @@ Cuidados: não usar a GPU para outra coisa durante o treino; desligar a suspens�
 - [ ] **Critérios da Seção 6 (parcial, falta o C):** M acima do pré-treino em aritmética ✅ (p = 7,4e-6); M acima de C ⏳ (C ainda não avaliado na mesma máquina).
   Transferência para o GSM8K: M acima do pré-treino (p = 0,0009) e, diferente do piloto, **não é só formato**: entre as perguntas respondidas com número, o acerto vai de 2,2% para 4,1%.
   Sem regressão no HellaSwag: ❌ queda pequena, mas significativa (28,1% → 27,1%). A queda do ARC-Easy se repete (no piloto, ocorreu em M e em C); o C dirá se a causa é o chat ou a matemática
-- [ ] Avaliar o C localmente: copiar `checkpoints/mid_c/final.pt` (456.503.035 bytes, SHA-256 conferido) para `shared/checkpoints/mid_c/` e rodar de novo `scripts/run_local.py` (pula o que já existe, avalia o C e roda o McNemar M × C; ~25 min)
+- [ ] **Último item pendente (18/11): avaliar o C localmente** (opcional para a entrega). Comandos em `ENTREGA.md`, seção 4. Sem a avaliação, o C é apresentado em seção separada (`ENTREGA.md`, seção 6, slide 8)
 - [ ] Em pré, C, M e SFT: perplexidade, HellaSwag, ARC-Easy (múltiplos benchmarks são diferencial), aritmética e GSM8K. Os 4 avaliados na mesma máquina local (decisão de 15/11), com o `mid_c/final.pt` copiado do servidor
 - [ ] Comparar antes e depois do SFT nas mesmas perguntas
 - [ ] Gerar tabelas e gráficos a partir de `results/*.json`
 
 ### Fase 8: Demo e entrega
-- [ ] **Checklist, comandos e tutorial de uso do modelo em `ENTREGA.md`** (16/11): disponibilizar os checkpoints (Hugging Face, cópia no servidor, resultados no Git), o que falta com estimativas, roteiro dos slides e perguntas prováveis
+- [x] **Checklist, comandos e tutorial de uso do modelo em `ENTREGA.md`** (16/11; atualizado em 18/11): disponibilizar os checkpoints (Hugging Face, cópia no servidor, resultados no Git), o que falta com estimativas, roteiro dos slides e perguntas prováveis
 - [ ] **Demo em Streamlit rodando localmente em notebook.** O login não aguenta e a GPU pode estar ocupada no dia. Exportar `safetensors` fp16 (~200 MB) e medir tokens/s em CPU
 - [ ] Ter um vídeo de reserva, caso a demo ao vivo falhe
-- [x] Checkpoints publicados no Hugging Face (16/11): https://huggingface.co/Xererr/slm-114m (público), com `pretrain`, `mid_m`, `sft` e `results` (pré, M e SFT). Falta enviar: `mid_c`, os `metrics.jsonl` e a página do modelo (escrita em `hf/README.md`)
-- [ ] README com reprodução por etapa e créditos
+- [x] Checkpoints publicados no Hugging Face: https://huggingface.co/Xererr/slm-114m (público), com `final.pt` de `pretrain`, `mid_m` e `sft`, `results` (pré, M e SFT) e, desde 18/11, os `metrics.jsonl` das três etapas. Falta enviar: `mid_c` e a página do modelo (`hf/README.md`, atualizada em 18/11)
+- [x] `README.md` na raiz (18/11): resultados, instalação, uso, reprodução por etapa e estrutura
+- [ ] `CREDITS.md` com o crédito a código de terceiros adaptado (exigência do enunciado)
 - [ ] Slides: arquitetura, Chinchilla, curvas, resultados, benchmark de matemática, discussão, demo (10–15 min)
 - [ ] Todo o grupo deve entender o código gerado com IA, pois haverá perguntas na apresentação
 

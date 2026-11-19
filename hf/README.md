@@ -13,9 +13,9 @@ datasets:
 
 # SLM 114M: pré-treino, mid-training e SFT do zero
 
-Modelo de linguagem pequeno (114.117.120 parâmetros) treinado do zero num trabalho de disciplina (PUCRS, Aprendizado Profundo II, 2026). O objetivo do experimento: verificar se um mid-training com matemática melhora a matemática do modelo, usando um grupo de controle sem matemática.
+Modelo de linguagem pequeno (114.117.120 parâmetros) treinado do zero num trabalho de disciplina (PUCRS, Aprendizado Profundo II, 2026). O experimento testa se um mid-training com matemática melhora a matemática do modelo, usando um grupo de controle sem matemática.
 
-Código, dados e decisões: https://github.com/Xererr/slm-scherer (branch `midtraining-m`; `PLANO.md`, `DADOS.md` e `ENTREGA.md`).
+Código, dados e decisões: https://github.com/FHaggs/slm (`README.md`, `PLANO.md`, `DADOS.md` e `ENTREGA.md`).
 
 > Os arquivos `.pt` são checkpoints de PyTorch para o código do projeto. **Não** são carregáveis com `transformers`.
 
@@ -25,10 +25,10 @@ Código, dados e decisões: https://github.com/Xererr/slm-scherer (branch `midtr
 |---|---|
 | `pretrain/final.pt` | Pré-treino (FineWeb-Edu) |
 | `mid_m/final.pt` | Mid-training **M**: chat + 25% de matemática |
-| `mid_c/final.pt` | Mid-training **C** (controle): só chat. *A publicar* |
 | `sft/final.pt` | SFT a partir de M. **Use este para conversar** |
+| `mid_c/final.pt` | Mid-training **C** (controle): só chat. *A publicar* |
 | `results/*.json` | Avaliações item a item (usadas no teste de McNemar) |
-| `*/metrics.jsonl` | Curvas de treino (loss, LR, validação, aritmética). *A publicar* |
+| `*/metrics.jsonl` | Curvas de treino: loss, LR, validação e, no mid-training, aritmética. Publicadas para pré-treino, M e SFT |
 
 ## Arquitetura
 
@@ -56,17 +56,17 @@ Avaliados na mesma máquina (RTX 4060). Perplexidade em 5,12M tokens de validaç
 | Pré-treino | 18,77 | 28,1% | 50,8% | 0,7% | 1,9% |
 | M | 61,07 | 27,1% | 37,2% | 3,2% | 4,1% |
 | SFT | 62,65 | 27,4% | 37,3% | 3,1% | 2,8% |
-| C | *a avaliar* | | | | |
+| C | *treinado; avaliação final pendente* | | | | |
 
 - M contra o pré-treino (teste de McNemar): aritmética p = 7,4e-6; GSM8K p = 0,0009. HellaSwag e ARC-Easy caem de forma significativa.
 - SFT contra M: diferenças pequenas (GSM8K p = 0,0498; HellaSwag p = 0,047).
+- C, durante o treino (medição no servidor, não comparável com a tabela): aritmética entre 0,99% e 2,44%, sem tendência; perplexidade no chat de 22,8 para 4,86.
 
 ## Como usar
 
 ```bash
-git clone https://github.com/Xererr/slm-scherer.git
-cd slm-scherer
-git checkout midtraining-m
+git clone https://github.com/FHaggs/slm.git
+cd slm
 uv sync
 uv run hf download Xererr/slm-114m sft/final.pt --local-dir modelos
 SLM_CHECKPOINT=modelos/sft/final.pt uv run streamlit run app/chat.py
@@ -95,6 +95,7 @@ print(tokenizer.decode(tokens))
 - Uma execução por configuração (sem várias sementes).
 - M e SFT foram treinados numa GPU diferente do pré-treino e do C (mesmo lote efetivo e mesmos hiperparâmetros).
 - O mid-training em chat piora o conhecimento geral medido (perplexidade no FineWeb, HellaSwag e ARC-Easy).
+- O grupo de controle (C) não teve avaliação final na mesma máquina dos demais.
 - Licença ainda não definida pelo grupo.
 
-Código escrito com auxílio de IA, revisado pelo grupo. Créditos a código e trabalhos de terceiros no repositório.
+Código escrito com auxílio de IA, revisado pelo grupo.
